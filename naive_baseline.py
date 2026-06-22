@@ -15,7 +15,11 @@ from src.m4_eval import load_test_set, evaluate_ragas, save_report
 from config import LLM_API_KEY, LLM_MODEL, NAIVE_COLLECTION, create_llm_client
 
 
+_LLM_GENERATION_DISABLED = False
+
+
 def main():
+    global _LLM_GENERATION_DISABLED
     print("=" * 60)
     print("BASIC RAG BASELINE")
     print("(paragraph chunking + dense-only, no rerank, no enrichment)")
@@ -42,7 +46,7 @@ def main():
         results = search.search(item["question"], top_k=3, collection=NAIVE_COLLECTION)
         contexts = [r.text for r in results]
 
-        if llm_client and contexts:
+        if llm_client and contexts and not _LLM_GENERATION_DISABLED:
             try:
                 context_str = "\n\n".join(contexts)
                 resp = llm_client.chat.completions.create(model=LLM_MODEL, messages=[
@@ -51,6 +55,7 @@ def main():
                 ])
                 answer = resp.choices[0].message.content
             except Exception:
+                _LLM_GENERATION_DISABLED = True
                 answer = contexts[0]
         else:
             answer = contexts[0] if contexts else "Không tìm thấy."
