@@ -5,8 +5,33 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# --- API Keys ---
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# --- API Keys / OpenAI-compatible LLM ---
+RAW_OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
+MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "")
+MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-v2.5-pro")
+
+OPENAI_API_KEY = MIMO_API_KEY or RAW_OPENAI_API_KEY
+LLM_API_KEY = OPENAI_API_KEY
+LLM_BASE_URL = MIMO_BASE_URL if MIMO_API_KEY else os.getenv("OPENAI_BASE_URL", "")
+LLM_MODEL = MIMO_MODEL if MIMO_API_KEY else os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+if LLM_API_KEY:
+    os.environ.setdefault("OPENAI_API_KEY", LLM_API_KEY)
+if LLM_BASE_URL:
+    os.environ.setdefault("OPENAI_BASE_URL", LLM_BASE_URL)
+    os.environ.setdefault("OPENAI_API_BASE", LLM_BASE_URL)
+
+
+def create_llm_client():
+    """Create an OpenAI-compatible client for OpenAI or Mimo."""
+    if not LLM_API_KEY:
+        return None
+    from openai import OpenAI
+    kwargs = {"api_key": LLM_API_KEY, "timeout": 30}
+    if LLM_BASE_URL:
+        kwargs["base_url"] = LLM_BASE_URL
+    return OpenAI(**kwargs)
 
 # --- Qdrant ---
 QDRANT_HOST = "localhost"
