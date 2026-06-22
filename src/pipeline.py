@@ -14,6 +14,9 @@ from src.m5_enrichment import enrich_chunks
 from config import LLM_API_KEY, LLM_MODEL, RERANK_TOP_K, create_llm_client
 
 
+_LLM_GENERATION_DISABLED = False
+
+
 def build_pipeline():
     """Build production RAG pipeline."""
     print("=" * 60)
@@ -59,14 +62,17 @@ def build_pipeline():
 
 def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) -> tuple[str, list[str]]:
     """Run single query through pipeline."""
+    global _LLM_GENERATION_DISABLED
     results = search.search(query)
     docs = [{"text": r.text, "score": r.score, "metadata": r.metadata} for r in results]
     reranked = reranker.rerank(query, docs, top_k=RERANK_TOP_K)
     contexts = [r.text for r in reranked] if reranked else [r.text for r in results[:3]]
 
-    if LLM_API_KEY and contexts:
+    if LLM_API_KEY and contexts and not _LLM_GENERATION_DISABLED:
         try:
             client = create_llm_client()
+            if client is None:
+                raise RuntimeError("LLM client is not configured")
             context_str = "\n\n".join(contexts)
             resp = client.chat.completions.create(model=LLM_MODEL, messages=[
                 {"role": "system", "content": "Trả lời CHỈ dựa trên context. Nếu không có → nói 'Không tìm thấy.'"},
@@ -75,6 +81,7 @@ def run_query(query: str, search: HybridSearch, reranker: CrossEncoderReranker) 
             answer = resp.choices[0].message.content
         except Exception as e:
             print(f"  ⚠️  LLM generation failed: {e}", flush=True)
+            _LLM_GENERATION_DISABLED = True
             answer = contexts[0]
     else:
         answer = contexts[0] if contexts else "Không tìm thấy thông tin."
