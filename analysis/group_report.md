@@ -1,35 +1,36 @@
-# Group Report — Lab 18: Production RAG
+# Group Report - Lab 18: Production RAG
 
-**Nhóm:** [Tên]  
-**Ngày:**
+**Nhom:** Ca nhan - Vu Van Huy  
+**Ngay:** 22/06/2026
 
-## Thành viên & Phân công
+## Thanh vien & Phan cong
 
-| Tên | Module | Hoàn thành | Tests pass |
-|-----|--------|-----------|-----------|
-| | M1: Chunking | ☐ | /8 |
-| | M2: Hybrid Search | ☐ | /5 |
-| | M3: Reranking | ☐ | /5 |
-| | M4: Evaluation | ☐ | /4 |
+| Ten | Module | Hoan thanh | Tests pass |
+|-----|--------|------------|------------|
+| Vu Van Huy | M1: Chunking | Done | 13/13 |
+| Vu Van Huy | M2: Hybrid Search | Done | 5/5 |
+| Vu Van Huy | M3: Reranking | Done | 5/5 |
+| Vu Van Huy | M4: Evaluation | Done | 4/4 |
+| Vu Van Huy | M5: Enrichment | Done | 10/10 |
 
-## Kết quả RAGAS
+## Ket qua evaluation
 
-| Metric | Naive | Production | Δ |
-|--------|-------|-----------|---|
-| Faithfulness | | | |
-| Answer Relevancy | | | |
-| Context Precision | | | |
-| Context Recall | | | |
+| Metric | Naive | Production | Delta |
+|--------|-------|------------|-------|
+| Faithfulness | 0.4437 | 0.4635 | +0.0198 |
+| Answer Relevancy | 0.5595 | 0.6065 | +0.0470 |
+| Context Precision | 0.2800 | 0.3073 | +0.0273 |
+| Context Recall | 0.3461 | 0.3734 | +0.0273 |
 
 ## Key Findings
 
-1. **Biggest improvement:**
-2. **Biggest challenge:**
-3. **Surprise finding:**
+1. **Biggest improvement:** Answer relevancy tang +0.0470 nho hybrid retrieval + reranking dua context gan cau hoi hon.
+2. **Biggest challenge:** Cau hoi multi-hop can lay nhieu source, vi du `thu_viec.md` + `bang_luong_2024.md`.
+3. **Surprise finding:** Versioned policy van de nham ban cu neu retrieval khong boost `hien hanh`, `thay the`, `v2024`.
 
-## Presentation Notes (5 phút)
+## Presentation Notes (5 phut)
 
-1. RAGAS scores (naive vs production):
-2. Biggest win — module nào, tại sao:
-3. Case study — 1 failure, Error Tree walkthrough:
-4. Next optimization nếu có thêm 1 giờ:
+1. RAGAS scores: production cai thien ca 4 metric so voi naive baseline.
+2. Biggest win: M2 + M3, vi RRF va rerank giup giam phu thuoc vao mot retriever.
+3. Case study: cau hoi luong thu viec Junior fail do thieu context bang luong; can multi-hop query.
+4. Next optimization: metadata effective_date/category, numeric boost, va query decomposition cho cau hoi tinh toan.
