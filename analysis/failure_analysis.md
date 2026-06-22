@@ -1,79 +1,84 @@
-# Failure Analysis - Lab 18: Production RAG
+# Phân Tích Lỗi - Lab 18: Production RAG
 
-**Ca nhan:** Vu Van Huy  
-**Ngay chay:** 22/06/2026  
-**Pipeline:** M1 hierarchical chunking -> M5 contextual enrichment fallback -> M2 BM25 + dense/hash fallback -> M3 reranking -> M4 evaluation.
+**Sinh viên:** Vũ Văn Huy  
+**Ngày chạy pipeline:** 22/06/2026  
+**Pipeline:** M1 hierarchical chunking -> M5 contextual enrichment -> M2 BM25 + dense/hash fallback -> M3 reranking -> M4 evaluation.
 
-## RAGAS Scores
+## Điểm Evaluation
 
-| Metric | Naive Baseline | Production | Delta |
-|--------|---------------|------------|-------|
+| Metric | Naive Baseline | Production | Chênh lệch |
+|--------|----------------|------------|------------|
 | Faithfulness | 0.4437 | 0.4635 | +0.0198 |
 | Answer Relevancy | 0.5595 | 0.6065 | +0.0470 |
 | Context Precision | 0.2800 | 0.3073 | +0.0273 |
 | Context Recall | 0.3461 | 0.3734 | +0.0273 |
 
-Production pipeline cai thien ca 4 metric. Muc tang lon nhat la answer relevancy, nho hybrid retrieval + reranking dua context dung hon vao prompt. Diem van thap chu yeu do cac cau hoi multi-hop/versioned can lay dong thoi nhieu tai lieu va so sanh nguong.
+Pipeline production cải thiện cả bốn chỉ số. Tuy vậy, điểm tuyệt đối vẫn chưa cao vì test set có nhiều câu hỏi multi-hop, câu hỏi cần tính toán, và câu hỏi phải phân biệt chính sách cũ với chính sách hiện hành.
 
 ## Bottom-5 Failures
 
-### #1
-- **Question:** Muon mua thiet bi tri gia 55 trieu can ai phe duyet?
-- **Expected:** Don hang tren 50.000.000 VND can Tong Giam doc (CEO) phe duyet.
-- **Got:** Tra loi suy ra Truong phong + Ke toan truong, khong lay dung nguong CEO.
-- **Worst metric:** context_precision = 0.1793
-- **Error Tree:** Output sai -> Context co mot phan lien quan nhung thieu bang tham quyen day du -> Query can numeric threshold routing.
-- **Root cause:** Retrieval lay cac chunk quy trinh mua sam/tam ung gan nghia, nhung khong uu tien chunk chua nguong `>50.000.000`.
-- **Suggested fix:** Them metadata category `procurement`, boost numeric tokens, va parent expansion cho bang tham quyen phe duyet.
+### #1. Mua thiết bị trị giá 55 triệu cần ai phê duyệt?
 
-### #2
-- **Question:** Luong thu viec cua nhan vien Junior muc cao nhat la bao nhieu?
-- **Expected:** Junior cao nhat 20.000.000 VND/thang; 85% la 17.000.000 VND/thang.
-- **Got:** Khong tim thay muc luong Junior cu the.
-- **Worst metric:** context_recall = 0.1654
-- **Error Tree:** Output sai -> Context thieu bang luong -> Query multi-hop chua lay ca `thu_viec.md` va `bang_luong_2024.md`.
-- **Root cause:** Cau hoi can hop nhat hai tai lieu: quy tac 85% trong thu viec va khung luong Junior trong bang luong.
-- **Suggested fix:** Multi-query decomposition: `luong thu viec 85%` + `Junior P1 P2 20.000.000`; sau do merge context theo source khac nhau.
+- **Câu hỏi:** Muốn mua thiết bị trị giá 55 triệu cần ai phê duyệt?
+- **Đáp án đúng:** Đơn hàng trên 50.000.000 VND cần Tổng Giám đốc/CEO phê duyệt.
+- **Câu trả lời của pipeline:** Suy ra Trưởng phòng + Kế toán trưởng, chưa lấy đúng ngưỡng CEO.
+- **Metric thấp nhất:** `context_precision = 0.1793`
+- **Error tree:** Output sai -> Context có một phần liên quan nhưng thiếu bảng thẩm quyền đầy đủ -> Query cần xử lý ngưỡng số tiền.
+- **Nguyên nhân gốc:** Retrieval lấy các chunk gần nghĩa về quy trình mua sắm/tạm ứng nhưng không ưu tiên chunk chứa ngưỡng `>50.000.000`.
+- **Hướng sửa:** Thêm metadata `procurement`, boost token số tiền, và mở rộng parent chunk khi gặp bảng thẩm quyền phê duyệt.
 
-### #3
-- **Question:** Can mua laptop 30 trieu cho nhan vien moi, ai phe duyet va can gi tu CNTT?
-- **Expected:** Director phe duyet, can xac nhan cau hinh ky thuat tu phong CNTT, va 3 bao gia.
-- **Got:** Khong tim thay quy trinh mua laptop/CNTT.
-- **Worst metric:** context_recall = 0.2140
-- **Error Tree:** Output sai -> Context khong dung -> Query gom hai y procurement + IT requirement.
-- **Root cause:** Retrieval bi hut sang dao tao/nghi phep thay vi mua sam; query dai lam loang token quan trong.
-- **Suggested fix:** Query rewrite tach thanh 2 subquery: `laptop 30 trieu phe duyet mua sam` va `thiet bi CNTT xac nhan cau hinh`.
+### #2. Lương thử việc Junior mức cao nhất là bao nhiêu?
 
-### #4
-- **Question:** Nghi phep khong luong 20 ngay can ai phe duyet?
-- **Expected:** Nghi 16-30 ngay can CEO phe duyet; nghi tren 14 ngay tu dong phan bao hiem cua minh.
-- **Got:** Khong tim thay nguoi phe duyet cu the.
-- **Worst metric:** context_recall = 0.2229
-- **Error Tree:** Output sai -> Context co policy nhung thieu/khong noi bat nguong 16-30 ngay -> LLM khong du tu tin ket luan.
-- **Root cause:** Child chunk khong giu tron bang/chuoi quy tac phe duyet theo so ngay.
-- **Suggested fix:** Structure-aware chunking rieng cho section `Quy trinh phe duyet`, giu nguyen cac dong 1-5, 6-15, 16-30 trong cung mot chunk.
+- **Câu hỏi:** Lương thử việc của nhân viên Junior mức cao nhất là bao nhiêu?
+- **Đáp án đúng:** Junior cao nhất là 20.000.000 VND/tháng; lương thử việc bằng 85%, tức 17.000.000 VND/tháng.
+- **Câu trả lời của pipeline:** Không tìm thấy mức lương Junior cụ thể.
+- **Metric thấp nhất:** `context_recall = 0.1654`
+- **Error tree:** Output sai -> Context thiếu bảng lương -> Query multi-hop chưa lấy cả `thu_viec.md` và `bang_luong_2024.md`.
+- **Nguyên nhân gốc:** Câu hỏi cần hợp nhất hai tài liệu: quy tắc 85% trong chính sách thử việc và khung lương Junior trong bảng lương.
+- **Hướng sửa:** Tách truy vấn thành `lương thử việc 85%` và `Junior P1 P2 20.000.000`, sau đó merge context từ nhiều source.
 
-### #5
-- **Question:** Bao lau phai doi mat khau mot lan?
-- **Expected:** Hien hanh v2.0 la 120 ngay; v1.0 cu la 90 ngay da bi thay the.
-- **Got:** Tra loi dung phan 120 ngay, nhung thieu so sanh voi version cu.
-- **Worst metric:** context_precision = 0.2056
-- **Error Tree:** Output gan dung -> Context co nhieu chunk mat khau lien quan -> Prompt chua ep noi ro version replacement.
-- **Root cause:** LLM rut gon cau tra loi va bo chi tiet policy cu/bi thay the trong ground truth.
-- **Suggested fix:** Them prompt rule: voi cau hoi versioned, phai neu `current policy`, `superseded policy`, va ngay hieu luc neu context co.
+### #3. Mua laptop 30 triệu cần ai phê duyệt và cần gì từ CNTT?
+
+- **Câu hỏi:** Nếu cần mua một chiếc laptop 30 triệu cho nhân viên mới, ai phê duyệt và cần gì từ phòng CNTT?
+- **Đáp án đúng:** Director phê duyệt, cần xác nhận cấu hình kỹ thuật từ phòng CNTT, và cần ít nhất 3 báo giá.
+- **Câu trả lời của pipeline:** Không tìm thấy quy trình mua laptop/CNTT.
+- **Metric thấp nhất:** `context_recall = 0.2140`
+- **Error tree:** Output sai -> Context không đúng -> Query gom hai ý procurement và IT requirement.
+- **Nguyên nhân gốc:** Retrieval bị hút sang đào tạo/nghỉ phép thay vì chính sách mua sắm; câu hỏi dài làm loãng token quan trọng.
+- **Hướng sửa:** Query rewrite thành hai subquery: `laptop 30 triệu phê duyệt mua sắm` và `thiết bị CNTT xác nhận cấu hình`.
+
+### #4. Nghỉ phép không lương 20 ngày cần ai phê duyệt?
+
+- **Câu hỏi:** Nghỉ phép không lương 20 ngày cần ai phê duyệt?
+- **Đáp án đúng:** Nghỉ 16-30 ngày cần CEO phê duyệt; nghỉ trên 14 ngày thì nhân viên tự đóng phần bảo hiểm của mình.
+- **Câu trả lời của pipeline:** Không tìm thấy người phê duyệt cụ thể.
+- **Metric thấp nhất:** `context_recall = 0.2229`
+- **Error tree:** Output sai -> Context có policy nhưng chưa làm nổi bật ngưỡng 16-30 ngày -> LLM không đủ tự tin kết luận.
+- **Nguyên nhân gốc:** Child chunk chưa giữ trọn cụm quy tắc phê duyệt theo số ngày.
+- **Hướng sửa:** Dùng structure-aware chunking riêng cho section “Quy trình phê duyệt”, giữ các dòng 1-5, 6-15, 16-30 trong cùng một chunk.
+
+### #5. Bao lâu phải đổi mật khẩu một lần?
+
+- **Câu hỏi:** Bao lâu phải đổi mật khẩu một lần?
+- **Đáp án đúng:** Chính sách hiện hành v2.0 là 120 ngày; chính sách cũ v1.0 là 90 ngày và đã bị thay thế.
+- **Câu trả lời của pipeline:** Trả lời đúng phần 120 ngày nhưng thiếu so sánh với chính sách cũ.
+- **Metric thấp nhất:** `context_precision = 0.2056`
+- **Error tree:** Output gần đúng -> Context có nhiều chunk mật khẩu liên quan -> Prompt chưa ép nêu rõ version replacement.
+- **Nguyên nhân gốc:** LLM rút gọn câu trả lời và bỏ chi tiết chính sách cũ/đã thay thế trong ground truth.
+- **Hướng sửa:** Thêm prompt rule: với câu hỏi versioned, phải nêu `current policy`, `superseded policy`, và ngày hiệu lực nếu context có.
 
 ## Case Study
 
-**Question chon phan tich:** Luong thu viec cua nhan vien Junior muc cao nhat la bao nhieu?
+**Câu hỏi chọn phân tích:** Lương thử việc của nhân viên Junior mức cao nhất là bao nhiêu?
 
-**Error Tree walkthrough:**
-1. Output dung? -> Khong, answer noi khong tim thay.
-2. Context dung? -> Chi co `thu_viec.md`, thieu `bang_luong_2024.md`.
-3. Query rewrite OK? -> Chua. Query can tach thanh phep tinh `85% x max Junior salary`.
-4. Fix o buoc: Retrieval/query planning, truoc khi rerank.
+1. **Output đúng chưa?** Chưa. Pipeline trả lời “không tìm thấy”.
+2. **Context đúng chưa?** Chưa đủ. Context có `thu_viec.md` nhưng thiếu `bang_luong_2024.md`.
+3. **Query rewrite ổn chưa?** Chưa. Câu hỏi cần tách thành phép tính `85% x max Junior salary`.
+4. **Nên sửa ở bước nào?** Retrieval/query planning, trước khi rerank.
 
-**Neu co them 1 gio, se optimize:**
-- Them multi-hop retriever lay toi thieu 2 source khac nhau khi cau hoi co phep tinh/so sanh.
-- Boost numeric + currency tokens trong BM25.
-- Them metadata `category` va `effective_date` de loc policy hien hanh.
-- Them prompt answer synthesis bat buoc trich cong thuc tinh toan.
+## Nếu Có Thêm Thời Gian
+
+- Thêm multi-hop retriever để lấy tối thiểu hai source khác nhau khi câu hỏi có phép tính hoặc so sánh.
+- Boost numeric/currency tokens trong BM25.
+- Thêm metadata `category`, `effective_date`, `status` để lọc chính sách hiện hành.
+- Cập nhật prompt synthesis để bắt buộc trình bày công thức tính toán.

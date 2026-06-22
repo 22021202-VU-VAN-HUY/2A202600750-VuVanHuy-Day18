@@ -1,57 +1,60 @@
-# Individual Reflection - Lab 18
+# Reflection Cá Nhân - Lab 18
 
-**Ten:** Vu Van Huy  
-**Module phu trach:** Full pipeline M1-M5  
-**Tests:** 37/37 passed  
-**Run:** `python main.py` da tao `reports/naive_baseline_report.json` va `reports/ragas_report.json`.
+**Họ tên:** Vũ Văn Huy  
+**Module phụ trách:** Toàn bộ pipeline M1-M5  
+**Kết quả test:** 37/37 tests passed  
+**Kết quả chạy pipeline:** Đã tạo `reports/naive_baseline_report.json` và `reports/ragas_report.json`.
 
-## 1. Mapping bai giang vao code
+## 1. Mapping Bài Giảng Vào Code
 
-| Lecture Concept | Module | Ham/Class cu the | Observation |
-|----------------|--------|------------------|-------------|
-| Semantic chunking | M1 | `chunk_semantic()` | Dung sentence boundary + lexical cosine fallback de gom cau lien quan; tranh cat giua y khi khong co embedding local. |
-| Hierarchical chunking | M1 | `chunk_hierarchical()` | Parent chunk giu ngu canh dai, child chunk dung cho retrieval chinh xac; pipeline index 105 child chunks tu 26 documents. |
-| Structure-aware chunking | M1 | `chunk_structure_aware()` | Parse markdown headers va giu `section` metadata; huu ich cho policy co bang/quy tac theo section. |
-| BM25 + Dense fusion | M2 | `BM25Search`, `DenseSearch`, `reciprocal_rank_fusion()` | BM25 bat keyword/tieng Viet, dense/hash fallback bat ngu nghia; RRF hop nhat rank list va giam lech do mot retriever sai. |
-| Cross-encoder reranking | M3 | `CrossEncoderReranker.rerank()` | Thu load CrossEncoder local, fallback lexical khi model chua tai; ket qua van sorted va uu tien doc lien quan trong tests. |
-| RAGAS 4 metrics | M4 | `evaluate_ragas()` | Co production path RAGAS that khi bat `LAB18_USE_REAL_RAGAS=1`, mac dinh fallback metric de test/pipeline on dinh. |
-| Failure diagnostic tree | M4 | `failure_analysis()` | Bottom failures cho thay loi chinh la context recall/precision trong cau hoi multi-hop va versioned policy. |
-| Contextual enrichment | M5 | `contextual_prepend()`, `_enrich_single_call()` | Fallback them prefix source vao chunk; khi bat `LAB18_USE_LLM_ENRICHMENT=1` co the dung Mimo de sinh summary/questions/context/metadata. |
+| Lecture Concept | Module | Hàm/Class cụ thể | Quan sát |
+|----------------|--------|------------------|----------|
+| Semantic chunking | M1 | `chunk_semantic()` | Tách câu và gom câu gần chủ đề bằng cosine lexical fallback, giúp không cắt ngữ cảnh quá vụn khi chưa có embedding local. |
+| Hierarchical chunking | M1 | `chunk_hierarchical()` | Tạo parent chunk giữ ngữ cảnh rộng và child chunk để retrieve chính xác. Pipeline tạo 105 child chunks từ 26 tài liệu. |
+| Structure-aware chunking | M1 | `chunk_structure_aware()` | Parse markdown headers và lưu `section` metadata, phù hợp với tài liệu chính sách có heading/bảng/quy tắc. |
+| BM25 + Dense fusion | M2 | `BM25Search`, `DenseSearch`, `reciprocal_rank_fusion()` | BM25 bắt keyword tiếng Việt, dense/hash fallback bắt gần nghĩa, RRF giảm rủi ro phụ thuộc vào một retriever. |
+| Cross-encoder reranking | M3 | `CrossEncoderReranker.rerank()` | Có production path dùng CrossEncoder và fallback lexical khi model chưa có local; kết quả vẫn sort theo `rerank_score`. |
+| RAGAS 4 metrics | M4 | `evaluate_ragas()` | Có đường chạy RAGAS thật khi bật `LAB18_USE_REAL_RAGAS=1`, mặc định dùng fallback metrics để test ổn định. |
+| Failure diagnostic tree | M4 | `failure_analysis()` | Bottom failures cho thấy lỗi chính nằm ở context recall/precision trong câu hỏi multi-hop và câu hỏi versioned policy. |
+| Contextual enrichment | M5 | `contextual_prepend()`, `_enrich_single_call()` | Fallback thêm nguồn tài liệu vào chunk; khi bật `LAB18_USE_LLM_ENRICHMENT=1` có thể dùng Mimo để sinh summary/questions/context/metadata. |
 
-## 2. Kho khan va cach giai quyet
+## 2. Khó Khăn Và Cách Giải Quyết
 
-- **Python version:** Ban dau `pip install -r requirements.txt` loi do Python 3.14 build `numpy==1.26.4` tu source va thieu C compiler. Cach xu ly: dung Python 3.11 theo `.python-version`.
-- **Dependency resolver:** `datasets>=2.19` keo pandas moi va co luc pip bao khong co distribution. Cach xu ly: pin `pandas>=2.0,<3` va `datasets>=2.19,<3`.
-- **Mimo thay OpenAI:** Repo scaffold hard-code `OPENAI_API_KEY`, `OpenAI()`, va `gpt-4o-mini`. Cach xu ly: them `MIMO_API_KEY`, `MIMO_BASE_URL`, `MIMO_MODEL`, `create_llm_client()` trong `config.py`, sau do pipeline/baseline/M5 dung client chung.
-- **Model va service ngoai:** CrossEncoder, SentenceTransformer, Qdrant co the chua san tren may cham. Cach xu ly: production path van co, nhung co fallback hash/lexical de test va pipeline khong bi crash.
-- **Windows Unicode:** `main.py` loi `UnicodeEncodeError: cp1252` khi in emoji. Cach xu ly: reconfigure stdout/stderr UTF-8 trong `main.py`, `pipeline.py`, `naive_baseline.py`, `check_lab.py`.
+- **Sai phiên bản Python:** Ban đầu `pip install -r requirements.txt` lỗi vì Python 3.14 phải build `numpy==1.26.4` từ source và máy thiếu C compiler. Cách xử lý là dùng Python 3.11 theo `.python-version`.
+- **Resolver dependency:** `datasets>=2.19` kéo nhiều version và phụ thuộc `pandas`. Mình pin thêm `pandas>=2.0,<3` và `datasets>=2.19,<3` để resolver ổn định hơn.
+- **Dùng Mimo thay OpenAI:** Scaffold hard-code `OPENAI_API_KEY`, `OpenAI()`, và `gpt-4o-mini`. Mình thêm `MIMO_API_KEY`, `MIMO_BASE_URL`, `MIMO_MODEL`, `create_llm_client()` trong `config.py`, sau đó dùng client chung trong pipeline/baseline/M5.
+- **Phụ thuộc model/service ngoài:** Qdrant, SentenceTransformer và CrossEncoder có thể chưa sẵn trên máy chấm. Mình giữ production path nhưng thêm fallback hash/lexical để test và pipeline không bị crash.
+- **Lỗi Unicode trên Windows:** `main.py` từng lỗi `UnicodeEncodeError: cp1252` khi in ký tự Unicode. Mình reconfigure stdout/stderr UTF-8 trong các entrypoint chính.
 
-## 3. Action Plan cho project
+## 3. Action Plan Cho Project
 
 ## Project: Internal Policy RAG Assistant
 
-### Hien tai
-- RAG pipeline hien tai: load markdown/PDF text layer, chunk hierarchical, hybrid retrieve, rerank, generate answer bang LLM OpenAI-compatible.
-- Known issues: cau hoi multi-hop can lay nhieu tai lieu, versioned policy de nham ban cu, numeric threshold/bang phe duyet chua duoc boost.
+### Hiện tại
 
-### Plan ap dung
-1. [ ] Chunking strategy: dung hierarchical + structure-aware cho policy section; giu bang approval trong cung chunk.
-2. [ ] Search: hybrid BM25/Dense, them boost cho so tien, ngay, version, va tu khoa phong ban.
-3. [ ] Reranking: dung CrossEncoder local neu da cache; fallback lexical trong CI/offline.
-4. [ ] Evaluation: chay RAGAS that khi co API budget, con hang ngay dung fallback metrics + regression test set.
-5. [ ] Enrichment: bat Mimo enrichment cho batch nho, sinh summary/questions/metadata; cache ket qua de tranh goi lai.
+- RAG pipeline hiện tại load markdown/PDF text layer, chunk theo hierarchical strategy, hybrid retrieve, rerank, rồi sinh câu trả lời bằng LLM OpenAI-compatible.
+- Known issues: câu hỏi multi-hop cần lấy nhiều tài liệu, chính sách cũ/mới dễ bị nhầm, các câu hỏi có số tiền/ngưỡng phê duyệt cần boost tốt hơn.
+
+### Plan Áp Dụng
+
+1. [ ] **Chunking strategy:** Dùng hierarchical + structure-aware chunking cho tài liệu chính sách; giữ bảng approval trong cùng chunk.
+2. [ ] **Search:** Dùng BM25 + dense hybrid; boost số tiền, số ngày, version, trạng thái “hiện hành/đã thay thế”.
+3. [ ] **Reranking:** Dùng CrossEncoder khi đã cache model; fallback lexical trong CI/offline.
+4. [ ] **Evaluation:** Dùng RAGAS thật khi có API budget; hằng ngày dùng fallback metrics và regression test set.
+5. [ ] **Enrichment:** Dùng Mimo enrichment cho batch nhỏ, sinh summary/questions/metadata và cache kết quả.
 
 ### Timeline
-- Tuan 1: Hoan thien metadata extraction, source/effective_date/category.
-- Tuan 2: Them multi-query decomposition cho cau hoi tinh toan va multi-hop.
-- Tuan 3: Them rerank/citation audit va threshold-specific tests.
-- Tuan 4: Chay eval hang ngay, ghi failure dashboard va toi uu prompt.
 
-## 4. Tu danh gia
+- **Tuần 1:** Hoàn thiện metadata extraction: source, category, effective_date, status.
+- **Tuần 2:** Thêm multi-query decomposition cho câu hỏi tính toán và multi-hop.
+- **Tuần 3:** Thêm citation audit, rerank tuning và threshold-specific tests.
+- **Tuần 4:** Chạy eval định kỳ, ghi failure dashboard và tối ưu prompt.
 
-| Tieu chi | Tu cham (1-5) | Ghi chu |
+## 4. Tự Đánh Giá
+
+| Tiêu chí | Tự chấm (1-5) | Ghi chú |
 |----------|---------------|---------|
-| Hieu bai giang | 5 | Da map du M1-M5 vao code va report. |
-| Code quality | 4 | Co fallback va tests, con co the tach helper thanh module rieng. |
-| Problem solving | 5 | Xu ly dependency, Mimo config, Unicode Windows, model fallback. |
-| Evaluation mindset | 4 | Co report/failure analysis, nhung RAGAS that duoc gate bang env de tranh ton API trong test. |
+| Hiểu bài giảng | 5 | Đã map đủ M1-M5 vào code và report. |
+| Code quality | 4 | Có fallback và tests, nhưng có thể tách helper thành module riêng hơn. |
+| Problem solving | 5 | Đã xử lý dependency, Mimo config, Unicode Windows và fallback model. |
+| Evaluation mindset | 4 | Có report/failure analysis, nhưng RAGAS thật được gate bằng env để tránh tốn API trong test. |
