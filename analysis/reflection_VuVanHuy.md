@@ -1,6 +1,7 @@
 # Reflection Cá Nhân - Lab 18
 
 **Họ tên:** Vũ Văn Huy  
+**Mã học viên:** 2A202600750
 **Module phụ trách:** Toàn bộ pipeline M1-M5  
 **Kết quả test:** 37/37 tests passed  
 **Kết quả chạy pipeline:** Đã tạo `reports/naive_baseline_report.json` và `reports/ragas_report.json`.
