@@ -1,5 +1,6 @@
 .env
 .venv/
+baocao.md
 .DS_Store
 __pycache__/
 *.pyc
